@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"oras.land/oras-go/v2/content/memory"
 )
 
 func TestSkipBuildingZtoc(t *testing.T) {
@@ -142,10 +141,13 @@ func TestBuildSociIndexNotLayer(t *testing.T) {
 				MediaType: tc.mediaType,
 				Digest:    "layerdigest",
 			}
-			cfg := &buildConfig{}
+
 			spanSize := int64(65535)
-			blobStore := memory.New()
-			_, err := buildSociLayer(ctx, cs, desc, spanSize, blobStore, cfg)
+
+			ib := NewIndexBuilder(cs).WithSpanSize(spanSize)
+
+			_, _, err := ib.buildSociLayer(ctx, desc, spanSize)
+
 			if tc.err != nil {
 				if !errors.Is(err, tc.err) {
 					t.Fatalf("%v: should error out as not a layer", tc.name)
@@ -200,12 +202,14 @@ func TestBuildSociIndexWithLimits(t *testing.T) {
 				MediaType: "application/vnd.oci.image.layer.",
 				Size:      tc.layerSize,
 			}
-			cfg := &buildConfig{
-				minLayerSize: tc.minLayerSize,
-			}
+
 			spanSize := int64(65535)
-			blobStore := memory.New()
-			ztoc, err := buildSociLayer(ctx, cs, desc, spanSize, blobStore, cfg)
+
+			ib := NewIndexBuilder(cs).WithSpanSize(spanSize).WithMinLayerSize(tc.minLayerSize)
+
+			ztoc, _, err := ib.buildSociLayer(ctx, desc, spanSize)
+
+			// ztoc, err := buildSociLayer(ctx, cs, desc, spanSize, blobStore, cfg)
 			if tc.ztocGenerated {
 				// we check only for build skip, which is indicated as nil value for ztoc and nil value for error
 				if ztoc == nil && err == nil {

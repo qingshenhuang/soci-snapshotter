@@ -31,9 +31,8 @@ import (
 const (
 	buildToolIdentifier = "AWS SOCI CLI v0.1"
 
-	spanSizeFlag           = "span-size"
-	minLayerSizeFlag       = "min-layer-size"
-	createORASManifestFlag = "oras"
+	spanSizeFlag     = "span-size"
+	minLayerSizeFlag = "min-layer-size"
 )
 
 // CreateCommand creates SOCI index for an image
@@ -54,10 +53,6 @@ var CreateCommand = cli.Command{
 			Name:  minLayerSizeFlag,
 			Usage: "The minimum layer size in bytes to build zTOC for. Default is 0.",
 			Value: 0,
-		},
-		cli.BoolFlag{
-			Name:  createORASManifestFlag,
-			Usage: "If set, will create an ORAS manifest instead of an OCI Artifact manifest. Default is false.",
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
@@ -95,22 +90,15 @@ var CreateCommand = cli.Command{
 			return err
 		}
 
-		manifestType := soci.ManifestOCIArtifact
-		if cliContext.Bool(createORASManifestFlag) {
-			manifestType = soci.ManifestORAS
-		}
+		ib := soci.NewIndexBuilder(cs).WithSpanSize(spanSize).WithMinLayerSize(minLayerSize).WithBuildToolIdentifer(buildToolIdentifier)
 
-		sociIndex, err := soci.BuildSociIndex(ctx, cs, srcImg, spanSize, blobStore,
-			soci.WithMinLayerSize(minLayerSize),
-			soci.WithBuildToolIdentifier(buildToolIdentifier),
-			soci.WithManifestType(manifestType))
-
+		sociIndex, _, err := ib.BuildIndex(ctx, srcImg.Target)
 		if err != nil {
 			return err
 		}
 
 		sociIndexWithMetadata := soci.IndexWithMetadata{
-			Index:       sociIndex,
+			Index:       &sociIndex,
 			ImageDigest: srcImg.Target.Digest,
 			// TODO: This is not strictly correct because the default platform matcher used in BuildSociIndex
 			// might match a compatible version (i.e. linux/amd64 will match linux/i386). Building indices for
